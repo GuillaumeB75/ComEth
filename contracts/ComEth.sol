@@ -3,8 +3,9 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract ComEth {
+contract ComEth is AccessControl {
     using Address for address payable;
     using Counters for Counters.Counter;
 
@@ -36,15 +37,16 @@ contract ComEth {
     address private _comEthOwner;
     bool private _isActive;
     bool private _hasPaid;
+    //roles
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     User[] private _usersList;
 
-    uint256 private _balance;
     string private _stringVote;
     Proposal[] private _proposalsList;
     Counters.Counter private _id;
 
-    mapping(address => uint256) private _balances;
+    mapping(address => uint256) private _investMentBalances;
     mapping(address => User) private _users;
     mapping(uint256 => Proposal) private _proposals;
     mapping(address => mapping(uint256 => bool)) private _hasVoted;
@@ -60,6 +62,7 @@ contract ComEth {
 
     constructor(address comEthOwner_) {
         _comEthOwner = comEthOwner_;
+        _setupRole(ADMIN_ROLE, _comEthOwner);
     }
 
     receive() external payable {
@@ -105,9 +108,9 @@ contract ComEth {
         require(_proposals[id_].statusVote == StatusVote.Running, "ComEth: Not a running proposal");
 
         if (block.timestamp > _proposals[id_].createdAt + _timeLimits[id_]) {
-            if (_proposals[id_].voteCount[userChoice_] > _usersList.length / 2) {
+            if (_proposals[id_].voteCount[userChoice_] > (_usersList.length / 2)) {
                 _proposals[id_].statusVote = StatusVote.Approved;
-                _proceedPaiement(id_);
+                _proceedPayment(id_);
             } else {
                 _proposals[id_].statusVote = StatusVote.Rejected;
             }
@@ -116,15 +119,19 @@ contract ComEth {
             _proposals[id_].voteCount[userChoice_] += 1;
             if (_proposals[id_].voteCount[userChoice_] > _usersList.length / 2) {
                 _proposals[id_].statusVote = StatusVote.Approved;
-                _proceedPaiement(id_);
+                _proceedPayment(id_);
             }
         }
         emit Voted(msg.sender, id_, _proposals[id_].proposition);
     }
 
-    function _proceedPaiement(uint256 id_) private {
+    function _proceedPayment(uint256 id_) private {
         payable(_proposals[id_].paiementReceiver).sendValue(_proposals[id_].paiementAmount);
         emit Spent(_proposals[id_].paiementReceiver, _proposals[id_].paiementAmount, id_);
+    }
+
+    function _ChangeRole() private {
+        emit RoleChanged();
     }
 
     function _toggleIsActive(address userAddress) private returns (bool) {
@@ -143,13 +150,13 @@ contract ComEth {
     }
 
     function _deposit(address sender, uint256 amount) private {
-        _balances[address(this)] += amount;
-        _balances[sender] += amount;
+        _investMentBalances[sender] += amount;
         emit Deposited(sender, amount);
     }
 
-    function pay(uint256 amount_) external payable {
-        _deposit(msg.sender, amount_);
+    function pay() external payable {
+        uint256 amount = msg.value;
+        _deposit(msg.sender, amount);
     }
 
     function toggleIsBanned(address userAddress_) public returns (bool) {
@@ -166,11 +173,15 @@ contract ComEth {
         return _users[userAddress_].isBanned;
     }
 
-    function getBalance(address userAddress_) public view returns (uint256){
-        return _balances[userAddress_];
-    }       
+    function getInvestmentBalance(address userAddress_) public view returns (uint256) {
+        return _investMentBalances[userAddress_];
+    }
 
-    /* - Créer rôles
+    function getBalance() public view returns (uint256) {
+        return address(this).balance;
+    }
+    /*  
+        - Créer rôles
         - Voter rôles / élections
         - Etoffer les options de vote (bannir, ...)
         - Gérer cotisations : cycles?
@@ -179,5 +190,5 @@ contract ComEth {
         - Ajouter modifiers
         - Sortie d'un user de la DAO + remboursement eventuel
         - fermeture de comEth + répartition du pot commun restant 
-     */ 
+     */
 }
