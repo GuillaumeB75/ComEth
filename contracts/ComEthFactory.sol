@@ -1,5 +1,11 @@
-//SPDX-License-Identifier: Unlicensed
+//SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+
+/**@title ComEthFactory
+  *@author Amine Benmissi, Guillaume Bezie, Sarah Marques, Stella Soler
+  *@notice Use this contract to create a new ComEth decentralized autonomous organization
+  *@dev 
+ */
 
 import "./ComEth.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -13,8 +19,8 @@ contract ComEthFactory is Ownable {
         _factoryOwner = factoryOwner_;
     }
 
-    function createComEth() external {
-        ComEth comEth = new ComEth(msg.sender);
+    function createComEth(uint256 subscriptionPrice_) external {
+        ComEth comEth = new ComEth(msg.sender,subscriptionPrice_);
         _comEthAddresses.push(comEth);
         emit ComEthCreated(comEth, msg.sender);
     }

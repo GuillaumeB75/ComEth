@@ -1,4 +1,4 @@
-//SPDX-License-Identifier: Unlicensed
+//SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -22,7 +22,9 @@ contract ComEth is AccessControl {
         bool hasPaid;
         bool isActive;
     }
-    // Proposal correct
+
+// Proposal correct
+
     struct Proposal {
         string[] voteOptions;
         uint256[] voteCount;
@@ -33,12 +35,15 @@ contract ComEth is AccessControl {
         address paiementReceiver;
         uint256 paiementAmount;
     }
-
     address private _comEthOwner;
+    
+    uint256 private _subscriptionPrice ;
+    uint256 private _subscriptionTimeCycle;
+    
     bool private _isActive;
     bool private _hasPaid;
     //roles
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    //bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     User[] private _usersList;
 
@@ -53,20 +58,40 @@ contract ComEth is AccessControl {
     mapping(uint256 => uint256) private _timeLimits;
     mapping(uint256 => uint256) private _nbVotes;
 
+//events
+
     event Deposited(address indexed sender, uint256 amount);
+    event Withdrawn(address indexed recipient, uint256 amount);
     event ProposalCreated(Proposal proposal);
     event Voted(address indexed voter, uint256 proposalId, string proposalDescription);
     event Spent(address paymentReceiver, uint256 amount, uint256 proposalId);
     event UserAdded(address indexed newUser, uint256 timestamp);
     event IsBanned(address user, uint256 timestamp, bool status);
 
-    constructor(address comEthOwner_) {
+//modifiers
+
+    modifier hasPaid {
+        require(_users[msg.sender].hasPaid = true , "Cometh: user have not payed subscription");
+        _;
+    }
+    modifier isNotBanned {
+        require(_users[msg.sender].isBanned = false , "Cometh: user is banned");
+        _;
+    }
+    modifier isActive {
+        require(_users[msg.sender].isActive = true , "Cometh: user is not active");
+        _;
+    }
+    
+    constructor(address comEthOwner_,uint256 subscriptionPrice_) {
         _comEthOwner = comEthOwner_;
+        _subscriptionPrice = subscriptionPrice_;
+        _subscriptionTimeCycle = 4 weeks;
         //_setupRole(ADMIN_ROLE, _comEthOwner);
     }
 
     receive() external payable {
-        _deposit(msg.sender, msg.value);
+        _deposit();
     }
 
     function submitProposal(
@@ -75,7 +100,7 @@ contract ComEth is AccessControl {
         uint256 timeLimit_,
         address paiementReceiver_,
         uint256 paiementAmount_
-    ) public returns (uint256) {
+    ) public isNotBanned returns (uint256) {
         _id.increment();
         uint256 id = _id.current();
 
@@ -103,7 +128,7 @@ contract ComEth is AccessControl {
         return _proposalsList;
     }
 
-    function vote(uint256 id_, uint256 userChoice_) public {
+    function vote(uint256 id_, uint256 userChoice_) public isNotBanned{
         require(_hasVoted[msg.sender][id_] == false, "ComEth: Already voted");
         require(_proposals[id_].statusVote == StatusVote.Running, "ComEth: Not a running proposal");
 
@@ -151,14 +176,18 @@ contract ComEth is AccessControl {
         emit UserAdded(userAddress_, block.timestamp);
     }
 
-    function _deposit(address sender, uint256 amount) private {
-        _investMentBalances[sender] += amount;
-        emit Deposited(sender, amount);
+    function _deposit() private {
+        _investMentBalances[address(this)] += _subscriptionPrice;
+        _investMentBalances[msg.sender] += _subscriptionPrice;
+        emit Deposited(msg.sender, _subscriptionPrice);
     }
-
+    function _withdraw() private {
+        uint256 amount = (_investMentBalances[msg.sender]/_investMentBalances[address(this)])*address(this).balance;
+        payable(msg.sender).sendValue(amount);
+        emit Withdrawn(msg.sender, amount);
+    }
     function pay() external payable {
-        uint256 amount = msg.value;
-        _deposit(msg.sender, amount);
+        _deposit();
     }
 
     function toggleIsBanned(address userAddress_) public returns (bool) {
