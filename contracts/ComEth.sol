@@ -61,16 +61,16 @@ contract ComEth is AccessControl {
     event UserAdded(address indexed newUser);
     event IsBanned(address user, uint256 timestamp, bool status);
 
-    modifier hasPaid() {
-        require(_users[msg.sender].hasPaid == true, "Cometh: user has not paid subscription");
-        _;
-    }
     modifier isNotBanned() {
         require(_users[msg.sender].isBanned == false, "Cometh: user is banned");
         _;
     }
     modifier isActive() {
         require(_users[msg.sender].isActive == true, "Cometh: user is not active");
+        _;
+    }
+    modifier hasPaid() {
+        require(_users[msg.sender].hasPaid == true, "Cometh: user has not paid subscription");
         _;
     }
 
@@ -85,13 +85,17 @@ contract ComEth is AccessControl {
         _deposit();
     }
 
+    function handleCycle() public {
+        _handleCycle();
+    }
+
     function submitProposal(
         string[] memory voteOptions_,
         string memory proposition_,
         uint256 timeLimit_,
         address paiementReceiver_,
         uint256 paiementAmount_
-    ) public isActive isNotBanned hasPaid returns (uint256) {
+    ) public isNotBanned isActive hasPaid returns (uint256) {
         _handleCycle();
         _id.increment();
         uint256 id = _id.current();
@@ -148,7 +152,7 @@ contract ComEth is AccessControl {
         emit Spent(_proposals[id_].paiementReceiver, _proposals[id_].paiementAmount, id_);
     }
 
-    function toggleIsActive() public returns (bool) {
+    function toggleIsActive() public isNotBanned returns (bool) {
         if (_users[msg.sender].isActive == false) {
             _users[msg.sender].isActive = true;
         } else {
@@ -178,6 +182,7 @@ contract ComEth is AccessControl {
             _users[msg.sender].unpaidSubscriptions = 1;
         }
         _users[msg.sender].hasPaid = true;
+       // payable(msg.sender).transfer(_subscriptionPrice * _users[msg.sender].unpaidSubscriptions);
         emit Deposited(msg.sender, _subscriptionPrice * _users[msg.sender].unpaidSubscriptions);
     }
 
@@ -214,6 +219,11 @@ contract ComEth is AccessControl {
         }
     }
 
+    function toggleIsBanned(address userAddress_) public {
+        require(msg.sender == _comEthOwner, "ComEth: You are not allowed to bann users.");
+        _toggleIsBanned(userAddress_);
+    }
+
     function _toggleIsBanned(address userAddress_) private returns (bool) {
         if (_users[userAddress_].isBanned == false) {
             _users[userAddress_].isBanned = true;
@@ -228,12 +238,28 @@ contract ComEth is AccessControl {
         return _users[userAddress_].isBanned;
     }
 
+    function getIsActive(address userAddress_) public view returns (bool) {
+        return _users[userAddress_].isActive;
+    }
+
+    function getHasPaid(address userAddress_) public view returns (bool) {
+        return _users[userAddress_].hasPaid;
+    }
+
     function getInvestmentBalance(address userAddress_) public view returns (uint256) {
         return _investMentBalances[userAddress_];
     }
 
     function getBalance() public view returns (uint256) {
         return address(this).balance;
+    }
+
+    function getCycle() public view returns (uint256) {
+        return _cycleStart;
+    }
+
+    function getTime() public view returns (uint256) {
+        return block.timestamp;
     }
     /*  
         - Créer rôles
