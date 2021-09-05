@@ -1,6 +1,9 @@
 # ComEth Dapp BackEnd Architecture
 
 ### - Solidity version 0.8.5
+### - Hardhat version  2.3.3
+
+---
 
 ### Architecture version 0.1
 
