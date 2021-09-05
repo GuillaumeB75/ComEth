@@ -12,12 +12,20 @@
 
 ---
 
-### Install the Repository :
+## Installation
 
-```zsh
+To use this dApp you need to "fork" this repository :
+
+- ComEth :
+
+On your Git Bash, choose the location then:
+
+```
 git clone https://github.com/Benmissi-A/ComEth
+cd ComEth
 yarn
 ```
+
 ---
 
 ### Test librairies :
