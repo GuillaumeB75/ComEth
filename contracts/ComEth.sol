@@ -1,9 +1,20 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+/**@title ComEth contract
+  *@author Amine Benmissi, Sarah Marques, Stella Soler, Guillaume Bézie
+  *@notice This contract defines the architecture and the rules of a DAO as well as the methods of votes and fund management.
+  *@dev  This contract is flexible and thus gives the possibility of modifying certain parameters according to your needs.
+ */
+
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+
+/**
+  *@notice This contract defines the architecture and the rules of a DAO as well as the methods of votes and fund management.
+  *@dev  This contract is flexible and thus gives the possibility of modifying certain parameters according to your needs.
+ */
 
 contract ComEth is AccessControl {
     using Address for address payable;
@@ -259,6 +270,11 @@ contract ComEth is AccessControl {
     function getCycle() public view returns (uint256) {
         return _cycleStart;
     }
+
+    /**
+    *@notice This contract defines the architecture and the rules of a DAO as well as the methods of votes and fund management.
+    *@dev  This contract is flexible and thus gives the possibility of modifying certain parameters according to your needs.
+    */
 
     function getTime() public view returns (uint256) {
         return block.timestamp;
