@@ -205,7 +205,7 @@ contract ComEth is AccessControl {
         }
     }
 
-    function _handleCycle() private {                                       //checking de temps dans le modifier
+    function _handleCycle() private {
         if (block.timestamp > _cycleStart + _subscriptionTimeCycle) {
             _cycleStart = _cycleStart + _subscriptionTimeCycle;
             for (uint256 i = 0; i < _usersList.length; i++) {
