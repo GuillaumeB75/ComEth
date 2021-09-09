@@ -261,19 +261,8 @@ contract ComEth is AccessControl {
         emit IsBanned(userAddress_, _users[userAddress_].isBanned);
         return _users[userAddress_].isBanned;
     }
-    function getUser(address useAddress_) public view returns(User memory){
-        return _users[useAddress_];
-    }
-    function getIsBanned(address userAddress_) public view returns (bool) {
-        return _users[userAddress_].isBanned;
-    }
-
-    function getIsActive(address userAddress_) public view returns (bool) {
-        return _users[userAddress_].isActive;
-    }
-
-    function getHasPaid(address userAddress_) public view returns (bool) {
-        return _users[userAddress_].hasPaid;
+    function getUser(address userAddress_) public view returns(User memory){
+        return _users[userAddress_];
     }
 
     function getInvestmentBalance(address userAddress_) public view returns (uint256) {
@@ -286,10 +275,6 @@ contract ComEth is AccessControl {
 
     function getCycle() public view returns (uint256) {
         return _cycleStart;
-    }
-
-    function getTime() public view returns (uint256) {
-        return block.timestamp;
     }
 
     function getSubscriptionPrice() public view returns (uint256) {
