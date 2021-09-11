@@ -2,9 +2,9 @@
 pragma solidity ^0.8.0;
 
 /**@title ComEth contract
-  *@author Amine Benmissi, Sarah Marques, Stella Soler, Guillaume Bézie
-  *@notice This contract defines the architecture and the rules of a DAO as well as the methods of votes and fund management.
-  *@dev  This contract is flexible and thus gives the possibility of modifying certain parameters according to your needs.
+ *@author Amine Benmissi, Sarah Marques, Stella Soler, Guillaume Bézie
+ *@notice This contract defines the architecture and the rules of a DAO as well as the methods of votes and fund management.
+ *@dev  This contract is flexible and thus gives the possibility of modifying certain parameters according to your needs.
  */
 
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -74,13 +74,18 @@ contract ComEth {
     modifier isNotBanned() {
         if (block.timestamp > _cycleStart + _subscriptionTimeCycle) {
             _cycleStart = _cycleStart + _subscriptionTimeCycle;
-            if ((_users[msg.sender].hasPaid == false) && (_users[msg.sender].isActive == true) && (_users[msg.sender].unpaidSubscriptions > 1 )) {
+            if (
+                (_users[msg.sender].hasPaid == false) &&
+                (_users[msg.sender].isActive == true) &&
+                (_users[msg.sender].unpaidSubscriptions > 1)
+            ) {
                 _users[msg.sender].isBanned = true;
                 _users[msg.sender].unpaidSubscriptions += 1;
             }
-        require(_users[msg.sender].isBanned == false, "Cometh: user is banned");
-        _;
-    }}
+            require(_users[msg.sender].isBanned == false, "Cometh: user is banned");
+            _;
+        }
+    }
 
     modifier isActive() {
         require(_users[msg.sender].isActive == true, "Cometh: user is not active");
@@ -88,7 +93,7 @@ contract ComEth {
     }
 
     modifier hasPaid() {
-        if(_userTimeStamp[msg.sender] != _cycleStart) {
+        if (_userTimeStamp[msg.sender] != _cycleStart) {
             _users[msg.sender].hasPaid = false;
         }
         require(_users[msg.sender].hasPaid == true, "Cometh: user has not paid subscription");
@@ -107,8 +112,7 @@ contract ComEth {
         _cycleStart = block.timestamp;
     }
 
-    receive() external payable {
-    }
+    receive() external payable {}
 
     function submitProposal(
         string[] memory voteOptions_,
@@ -116,7 +120,7 @@ contract ComEth {
         uint256 timeLimit_,
         address paiementReceiver_,
         uint256 paiementAmount_
-    ) public isNotBanned isActive hasPaid returns (uint256) {
+    ) public isNotBanned isActive hasPaid returns (uint256 id_) {
         _id.increment();
         uint256 id = _id.current();
 
@@ -172,7 +176,7 @@ contract ComEth {
         emit Spent(_proposals[id_].paiementReceiver, _proposals[id_].paiementAmount, id_);
     }
 
-    function toggleIsActive() public isNotBanned returns(bool) {
+    function toggleIsActive() public isNotBanned returns (bool) {
         if (_users[msg.sender].isActive == false) {
             _users[msg.sender].isActive = true;
             _nbActiveUsers += 1;
@@ -219,14 +223,14 @@ contract ComEth {
         require(_users[msg.sender].hasPaid == false, "ComEth: You have already paid your subscription for this month.");
         require(msg.value >= getAmountToBePaid(msg.sender), "ComEth: unsufficient amount to pay for subscription");
         _userTimeStamp[msg.sender] = _cycleStart;
-        if(msg.value > getAmountToBePaid(msg.sender)) {
+        if (msg.value > getAmountToBePaid(msg.sender)) {
             payable(msg.sender).sendValue(msg.value - getAmountToBePaid(msg.sender));
         }
         _deposit();
     }
 
     function quitComEth() public userExist {
-        if(!_users[msg.sender].isBanned) {
+        if (!_users[msg.sender].isBanned) {
             _withdraw();
         }
         _users[msg.sender].exists = false;
@@ -248,6 +252,16 @@ contract ComEth {
         emit IsBanned(userAddress_, _users[userAddress_].isBanned);
         return _users[userAddress_].isBanned;
     }
+
+    /*function toggleIsActive() public isNotBanned returns(bool) {
+        if (_users[msg.sender].isActive == false) {
+            _users[msg.sender].isActive = true;
+            _nbActiveUsers += 1;
+        } else {
+            _users[msg.sender].isActive = false;
+            _nbActiveUsers -= 1;
+        }
+        return _users[msg.sender].isActive;*/
 
     function getUser(address userAddress_) public view returns (User memory) {
         return _users[userAddress_];
@@ -280,5 +294,4 @@ contract ComEth {
     function getActiveUsersNb() public view returns (uint256) {
         return _nbActiveUsers;
     }
-
 }
