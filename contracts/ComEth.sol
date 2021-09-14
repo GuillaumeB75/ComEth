@@ -1,3 +1,4 @@
+
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
@@ -15,7 +16,6 @@ contract ComEth {
     using Counters for Counters.Counter;
 
     enum StatusVote {
-        Inactive,
         Running,
         Approved,
         Rejected
@@ -31,8 +31,8 @@ contract ComEth {
     }
 
     struct Proposal {
-        string[] voteOptions;
-        uint256[] voteCount;
+        uint256 nbYes;
+        uint256 nbNo;
         StatusVote statusVote;
         uint256 createdAt;
         address author;
@@ -41,6 +41,7 @@ contract ComEth {
         uint256 paiementAmount;
     }
 
+    uint256 private _createdAt;
     address private _comEthOwner;
     uint256 private _subscriptionPrice;
     uint256 private _subscriptionTimeCycle;
@@ -51,6 +52,7 @@ contract ComEth {
     Proposal[] private _proposalsList;
     Counters.Counter private _id;
     uint256 private _cycleStart;
+    address private _dev;
 
     mapping(address => uint256) private _userTimeStamp;
 
@@ -68,6 +70,7 @@ contract ComEth {
     event ProposalCreated(uint256 id, string description);
     event Voted(address indexed voter, uint256 proposalId, string proposalDescription);
     event Spent(address paymentReceiver, uint256 amount, uint256 proposalId);
+    event Rejected(uint256 proposalId);
     event UserAdded(address indexed newUser);
     event IsBanned(address user, bool status);
 
@@ -94,7 +97,8 @@ contract ComEth {
     modifier checkSubscription() {
         //on check le cycle
         if (block.timestamp > _cycleStart + _subscriptionTimeCycle) {
-            _cycleStart = _cycleStart + ((block.timestamp - _cycleStart) / _subscriptionTimeCycle);
+            uint256 newCycleStart = _cycleStart + ((block.timestamp - _cycleStart) / _subscriptionTimeCycle) * _subscriptionTimeCycle;
+            _cycleStart = newCycleStart;
         }
         //_userTimeStamp[msg.sender] === 0 nouvel inscrit
         if(_userTimeStamp[msg.sender] != 0){
@@ -104,17 +108,16 @@ contract ComEth {
                 _users[msg.sender].hasPaid = false;
                 // réinitialisation du unpaidSubscription
                 if (_users[msg.sender].isActive) {
-                        _users[msg.sender].unpaidSubscriptions = (_cycleStart - _userTimeStamp[msg.sender]) % _subscriptionTimeCycle;
+                        _users[msg.sender].unpaidSubscriptions = (_cycleStart - _userTimeStamp[msg.sender]) / _subscriptionTimeCycle;
                 // pour les autres , a un nouveau cycle egal  1 subscription a payer  ;)
                 }
                 }
             }
             if(_users[msg.sender].unpaidSubscriptions >= 2) {
                 _users[msg.sender].isBanned = true;
+                _nbActiveUsers -= 1;
             }
-            // on remet tout a jour  avec le nouveau cycle start
-            // haspaid et banned sont pris en compte par les autres modifier ;)
-            // a tester ^^
+
         _userTimeStamp[msg.sender] = _cycleStart;
         _;
     }
@@ -123,24 +126,25 @@ contract ComEth {
         _comEthOwner = comEthOwner_;
         _subscriptionPrice = subscriptionPrice_;
         _subscriptionTimeCycle = 4 weeks;
+        _createdAt = block.timestamp;
         _cycleStart = block.timestamp;
+        _dev = msg.sender;
     }
 
     receive() external payable {}
 
     function submitProposal(
-        string[] memory voteOptions_,
         string memory proposition_,
         uint256 timeLimit_,
         address paiementReceiver_,
         uint256 paiementAmount_
-    ) public isActive checkSubscription isNotBanned returns (uint256) {
+    ) public isActive checkSubscription hasPaid returns (uint256) {
         _id.increment();
         uint256 id = _id.current();
 
         _proposals[id] = Proposal({
-            voteOptions: voteOptions_,
-            voteCount: new uint256[](voteOptions_.length),
+            nbYes: 0,
+            nbNo: 0,
             statusVote: StatusVote.Running,
             createdAt: block.timestamp,
             author: msg.sender,
@@ -163,27 +167,36 @@ contract ComEth {
         return _proposalsList;
     }
 
-    function vote(uint256 id_, uint256 userChoice_) public userExist isActive checkSubscription isNotBanned {
+    function vote(uint256 id_, uint256 userChoice_) public userExist isActive checkSubscription hasPaid {
         require(_hasVoted[msg.sender][id_] == false, "ComEth: Already voted");
-        // require(_proposals[id_].statusVote == StatusVote.Running, "ComEth: Not a running proposal");
+        require(_proposals[id_].statusVote == StatusVote.Running, "ComEth: Not a running proposal");
 
         if (block.timestamp > _proposals[id_].createdAt + _timeLimits[id_]) {
-            if (_proposals[id_].voteCount[userChoice_] > (_nbActiveUsers / 2)) {
+            if (_proposals[id_].nbYes > (_nbActiveUsers / 2)) {
                 _proposals[id_].statusVote = StatusVote.Approved;
                 _proceedPayment(id_);
             } else {
                 _proposals[id_].statusVote = StatusVote.Rejected;
+                emit Rejected(id_);
             }
         } else { 
             _hasVoted[msg.sender][id_] = true;
-            _proposals[id_].voteCount[userChoice_] += 1;
-            if (_proposals[id_].voteCount[userChoice_] > _nbActiveUsers / 2) {
+            if(userChoice_ == 1) {
+                _proposals[id_].nbYes += 1;
+            }
+            if(userChoice_ == 0) {
+                _proposals[id_].nbNo += 1;
+            }
+            if (_proposals[id_].nbYes > _nbActiveUsers / 2) {
                 _proposals[id_].statusVote = StatusVote.Approved;
                 _proceedPayment(id_);
             }
+            if (_proposals[id_].nbNo > _nbActiveUsers / 2) {
+                _proposals[id_].statusVote = StatusVote.Rejected;
+                emit Rejected(id_);
+            }
             emit Voted(msg.sender, id_, _proposals[id_].proposition);
         }
-        
     }
 
     function _proceedPayment(uint256 id_) private {
@@ -192,7 +205,6 @@ contract ComEth {
     }
 
     function toggleIsActive() public isNotBanned returns(bool){
-        //require(_users[msg.sender].isBanned == false, "ComEth: You can not use this function if you are banned.");
         _users[msg.sender].isActive = !_users[msg.sender].isActive;
         if(_users[msg.sender].isActive == false) {
             _nbActiveUsers -= 1;
@@ -216,48 +228,47 @@ contract ComEth {
         emit UserAdded(msg.sender);
     }
 
-    function _deposit(uint256 amount) private {
+    function _deposit() private {
+        uint256 amount = _subscriptionPrice *  _users[msg.sender].unpaidSubscriptions;
         _investmentBalances[address(this)] += amount;
         _investmentBalances[msg.sender] += amount;
         if (_users[msg.sender].isBanned) {
             _users[msg.sender].isBanned = false;
-            _users[msg.sender].unpaidSubscriptions = 1;
+            _nbActiveUsers += 1;
+            _users[msg.sender].unpaidSubscriptions = 0;
         }
         emit Deposited(msg.sender, amount);
     }
 
-    function _withdraw() internal {
-        payable(msg.sender).transfer(_investmentBalances[msg.sender] / _investmentBalances[address(this)] * address(this).balance);
-        emit Withdrawn(msg.sender, _investmentBalances[msg.sender] / _investmentBalances[address(this)] * address(this).balance);
+    function _withdraw(uint256 amount) private {
+        payable(msg.sender).sendValue(amount);
+        emit Withdrawn(msg.sender, amount);
     }
 
     /// msg.Value will be calculated in the front part and equal getPaymentAmount(msg.sender)
     function pay() external payable userExist isActive checkSubscription {
         require(_users[msg.sender].hasPaid == false, "ComEth: You have already paid your subscription for this month.");
         require(msg.value >= (_subscriptionPrice *  _users[msg.sender].unpaidSubscriptions), "ComEth: unsufficient amount to pay for subscription");
-        uint256 amountToBePaid = _subscriptionPrice *  _users[msg.sender].unpaidSubscriptions;
-        if(msg.value > amountToBePaid) {
-            payable(msg.sender).sendValue(msg.value - amountToBePaid);
+        if(msg.value > _subscriptionPrice *  _users[msg.sender].unpaidSubscriptions) {
+            payable(msg.sender).sendValue(msg.value - _subscriptionPrice *  _users[msg.sender].unpaidSubscriptions);
         }
         _users[msg.sender].hasPaid = true;
-        _deposit(amountToBePaid);
+        _deposit();
     }
 
-    function quitComEth() public payable userExist checkSubscription {
+    function quitComEth() public userExist checkSubscription {
         if(_users[msg.sender].isBanned == false && _investmentBalances[msg.sender] > 0) {
-            _withdraw();
+            uint256 amount = getWithdrawalAmount();
+            _withdraw(amount);
             _investmentBalances[address(this)] -= _investmentBalances[msg.sender];
         }
         _investmentBalances[msg.sender] = 0;
         _users[msg.sender].exists = false;
     }
 
-    function toggleIsBanned(address userAddress_) public userExist {
-        _toggleIsBanned(userAddress_);
-    }
-
-    function _toggleIsBanned(address userAddress_) private returns (bool) {
-        
+    // sert à faire les tests seulement 
+    /* function toggleIsBanned(address userAddress_) public returns (bool) {
+        require(msg.sender == _dev, "ComEth: You are not allowed to use this function");
         if (_users[userAddress_].isBanned == false) {
             _users[userAddress_].isBanned = true;
             _nbActiveUsers -= 1;
@@ -266,8 +277,8 @@ contract ComEth {
             _nbActiveUsers += 1;
         }
         emit IsBanned(userAddress_, _users[userAddress_].isBanned);
-        return _users[userAddress_].isBanned;
-    }
+        return _users[userAddress_].isBanned;    
+        } */
 
     /*function toggleIsActive() public isNotBanned returns(bool) {
         if (_users[msg.sender].isActive == false) {
@@ -308,11 +319,16 @@ contract ComEth {
     }
 
     function getWithdrawalAmount() public view returns (uint256) {
-        uint256 amount = (_investmentBalances[msg.sender] / _investmentBalances[address(this)]) * address(this).balance;
-        return amount;
+        return ((((_investmentBalances[msg.sender] * 100) / _investmentBalances[address(this)]) * address(this).balance) / 100 );
     }
 
-    function getActiveUsersNb() public view returns (uint256) {
+    // tous les users censés être bannis parce que > 2 impayés
+    // ne seront pas comptés... 
+    /* function getActiveUsersNb() public view returns (uint256) {
         return _nbActiveUsers;
+    } */
+
+    function getCreationTime() public view returns (uint256) {
+        return _createdAt;
     }
 }
