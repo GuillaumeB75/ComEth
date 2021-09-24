@@ -23,8 +23,8 @@ contract ComEthFactory {
     ///@notice create a ComEth community and manage a common pote like a DAO
     /**@param subscriptionPrice_ the price in weis of the subscription 
     that each user will have to pay every 4 weeks to be able to use the future ComEth*/
-    function createComEth(uint256 subscriptionPrice_) external {
-        ComEth comEth = new ComEth(subscriptionPrice_);
+    function createComEth(uint256 subscriptionPrice_, string memory chosenName_) external {
+        ComEth comEth = new ComEth(subscriptionPrice_, chosenName_);
         _comEthAddresses.push(comEth);
         emit ComEthCreated(address(comEth));
     }

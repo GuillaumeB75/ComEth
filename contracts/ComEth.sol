@@ -40,6 +40,7 @@ contract ComEth {
         uint256 paiementAmount;
     }
 
+    string private _chosenName;
     uint256 private _createdAt;
     uint256 private _subscriptionPrice;
     uint256 private _subscriptionTimeCycle;
@@ -120,7 +121,8 @@ contract ComEth {
     ///@param subscriptionPrice_ the creator of ComEth chooses the amount of wei to be paid by each user every 4 weeks
     ///@notice the first cycle starts when the contract is deployed
     ///@dev no owner foreseen
-    constructor(uint256 subscriptionPrice_) {
+    constructor(uint256 subscriptionPrice_, string memory chosenName_) {
+        _chosenName = chosenName_;
         _subscriptionPrice = subscriptionPrice_;
         _subscriptionTimeCycle = 4 weeks;
         _createdAt = block.timestamp;
